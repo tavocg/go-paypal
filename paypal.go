@@ -75,15 +75,11 @@ func (c *Client) checkAT(ctx context.Context) error {
 }
 
 func clientFieldsFromEnv(c *Client) error {
-	value := reflect.ValueOf(c)
-	if value.Kind() != reflect.Ptr || value.IsNil() {
-		return fmt.Errorf("client must be a non-nil pointer")
+	if c == nil {
+		return fmt.Errorf("client must be non-nil")
 	}
 
-	elem := value.Elem()
-	if elem.Kind() != reflect.Struct {
-		return fmt.Errorf("client must point to a struct")
-	}
+	elem := reflect.ValueOf(c).Elem()
 
 	elemType := elem.Type()
 	for i := 0; i < elem.NumField(); i++ {
