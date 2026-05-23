@@ -114,7 +114,7 @@ func clientFieldsFromEnv(c *Client) error {
 	return nil
 }
 
-func (c *Client) request(ctx context.Context, method, endpoint string, payload any, dest any) error {
+func (c *Client) api(ctx context.Context, method, endpoint string, payload any, dest any) error {
 	if err := c.checkAT(ctx); err != nil {
 		return err
 	}
