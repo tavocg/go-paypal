@@ -1,6 +1,15 @@
 package paypal
 
-import "time"
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"time"
+)
 
 const (
 	createOrderEndpoint         = "/v2/checkout/orders"
@@ -144,6 +153,63 @@ type CaptureOrderPaymentResponse struct {
 	} `json:"links"`
 }
 
-// TODO: CreateOrder, CaptureOrderPayment *Client functions that check the at,
-// and make a request sending it as Authorization: Bearer header, using the
-// const endpoints.
+func (c *Client) CreateOrder(ctx context.Context, order CreateOrderRequest) (*CreateOrderResponse, error) {
+	response := &CreateOrderResponse{}
+	if err := c.request(ctx, http.MethodPost, createOrderEndpoint, order, response); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func (c *Client) CaptureOrderPayment(ctx context.Context, orderID string) (*CaptureOrderPaymentResponse, error) {
+	if orderID == "" {
+		return nil, fmt.Errorf("orderID is required")
+	}
+
+	response := &CaptureOrderPaymentResponse{}
+	endpoint := strings.Replace(captureOrderPaymentEndpoint, "{orderID}", orderID, 1)
+	if err := c.request(ctx, http.MethodPost, endpoint, nil, response); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func (c *Client) request(ctx context.Context, method, endpoint string, payload any, dest any) error {
+	if err := c.checkAT(ctx); err != nil {
+		return err
+	}
+
+	var body io.Reader
+	if payload != nil {
+		raw, err := json.Marshal(payload)
+		if err != nil {
+			return err
+		}
+		body = bytes.NewReader(raw)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, c.hostURL+endpoint, body)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.currentAT.Token)
+	req.Header.Set("Content-Type", "application/json")
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		body, _ := io.ReadAll(res.Body)
+		return fmt.Errorf("paypal request failed: status %d: %s", res.StatusCode, string(body))
+	}
+
+	if dest == nil {
+		return nil
+	}
+
+	return json.NewDecoder(res.Body).Decode(dest)
+}
