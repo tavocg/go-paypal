@@ -27,12 +27,6 @@ type Client struct {
 
 type ClientOpt func(*Client)
 
-func WithHost(url string) ClientOpt {
-	return func(c *Client) {
-		c.hostURL = url
-	}
-}
-
 func WithClientID(clientID string) ClientOpt {
 	return func(c *Client) {
 		c.clientID = clientID
@@ -45,8 +39,8 @@ func WithClientSecret(clientSecret string) ClientOpt {
 	}
 }
 
-func NewClient(ctx context.Context, opts ...ClientOpt) (*Client, error) {
-	c := &Client{}
+func NewClient(hostURL string, opts ...ClientOpt) (*Client, error) {
+	c := &Client{hostURL: hostURL}
 	for _, opt := range opts {
 		opt(c)
 	}
