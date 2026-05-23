@@ -1,9 +1,12 @@
-// Package paypal <description here>
+// Package paypal provides a minimal client for the PayPal REST API.
 package paypal
 
 import (
 	"context"
 	"fmt"
+	"os"
+	"reflect"
+	"unsafe"
 )
 
 const (
@@ -34,7 +37,7 @@ func WithClientID(clientID string) ClientOpt {
 
 func WithClientSecret(clientSecret string) ClientOpt {
 	return func(c *Client) {
-		c.clientID = clientSecret
+		c.clientSecret = clientSecret
 	}
 }
 
@@ -44,8 +47,9 @@ func NewClient(ctx context.Context, opts ...ClientOpt) (*Client, error) {
 		opt(c)
 	}
 
-	// TODO: (create and) run function clientFieldsFromEnv(c *Client) that
-	// uses reflect to set the field from the env:"ENV_VAR" tag of the struct
+	if err := clientFieldsFromEnv(c); err != nil {
+		return nil, err
+	}
 
 	if c.hostURL == "" || c.clientID == "" || c.clientSecret == "" {
 		return nil, fmt.Errorf("missing required fields")
@@ -63,5 +67,49 @@ func (c *Client) checkAT(ctx context.Context) error {
 		}
 		c.currentAT = at
 	}
+	return nil
+}
+
+func clientFieldsFromEnv(c *Client) error {
+	value := reflect.ValueOf(c)
+	if value.Kind() != reflect.Ptr || value.IsNil() {
+		return fmt.Errorf("client must be a non-nil pointer")
+	}
+
+	elem := value.Elem()
+	if elem.Kind() != reflect.Struct {
+		return fmt.Errorf("client must point to a struct")
+	}
+
+	elemType := elem.Type()
+	for i := 0; i < elem.NumField(); i++ {
+		fieldType := elemType.Field(i)
+		envVar := fieldType.Tag.Get("env")
+		if envVar == "" {
+			continue
+		}
+
+		field := elem.Field(i)
+		if field.Kind() != reflect.String {
+			return fmt.Errorf("env tag only supported on string fields: %s", fieldType.Name)
+		}
+		currentValue := field.String()
+		if currentValue != "" {
+			continue
+		}
+
+		if envValue, ok := os.LookupEnv(envVar); ok {
+			if field.CanSet() {
+				field.SetString(envValue)
+				continue
+			}
+			if !field.CanAddr() {
+				return fmt.Errorf("cannot address field %s", fieldType.Name)
+			}
+
+			reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem().SetString(envValue)
+		}
+	}
+
 	return nil
 }
