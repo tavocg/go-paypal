@@ -152,7 +152,13 @@ type CaptureOrderPaymentResponse struct {
 
 func (c *Client) CreateOrder(ctx context.Context, order CreateOrderRequest) (*CreateOrderResponse, error) {
 	response := &CreateOrderResponse{}
-	if err := c.request(ctx, http.MethodPost, createOrderEndpoint, order, response); err != nil {
+	if err := c.request(
+		ctx,
+		http.MethodPost,
+		createOrderEndpoint,
+		order,
+		response,
+	); err != nil {
 		return nil, err
 	}
 	return response, nil
@@ -165,7 +171,14 @@ func (c *Client) CaptureOrderPayment(ctx context.Context, orderID string) (*Capt
 
 	response := &CaptureOrderPaymentResponse{}
 	endpoint := strings.Replace(captureOrderPaymentEndpoint, "{orderID}", orderID, 1)
-	if err := c.request(ctx, http.MethodPost, endpoint, nil, response); err != nil {
+
+	if err := c.request(
+		ctx,
+		http.MethodPost,
+		endpoint,
+		nil,
+		response,
+	); err != nil {
 		return nil, err
 	}
 	return response, nil
