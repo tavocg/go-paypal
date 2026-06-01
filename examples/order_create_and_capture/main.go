@@ -57,9 +57,7 @@ func createOrderHandler(client *paypal.Client) http.HandlerFunc {
 				Paypal: paypal.OrderPaypalPaymentSource{
 					ExperienceContext: &paypal.OrderPaypalExperienceContext{
 						PaymentMethodPreference: "IMMEDIATE_PAYMENT_REQUIRED",
-						LandingPage:             "LOGIN",
 						ShippingPreference:      "NO_SHIPPING",
-						UserAction:              "PAY_NOW",
 					},
 					Address: &paypal.PostalAddress{
 						CountryCode: "CR",
@@ -132,7 +130,7 @@ const indexHTML = `<!doctype html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PayPal Order Create and Capture</title>
-  <script src="https://www.paypal.com/sdk/js?client-id=%s&currency=USD&buyer-country=CR"></script>
+  <script src="https://www.paypal.com/sdk/js?client-id=%s&currency=USD"></script>
   <style>
     :root {
       color-scheme: light;
