@@ -138,7 +138,7 @@ func (c *Client) api(ctx context.Context, method, endpoint string, payload any, 
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		body, _ := io.ReadAll(res.Body)
-		return fmt.Errorf("paypal request failed: status %d: %s", res.StatusCode, string(body))
+		return newError(res.StatusCode, body)
 	}
 
 	if dest == nil {

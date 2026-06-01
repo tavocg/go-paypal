@@ -14,52 +14,61 @@ const (
 )
 
 type CreateOrderRequest struct {
-	PaymentSource struct {
-		Paypal struct {
-			ExperienceContext struct {
-				PaymentMethodPreference string `json:"payment_method_preference"`
-				LandingPage             string `json:"landing_page"`
-				ShippingPreference      string `json:"shipping_preference"`
-				UserAction              string `json:"user_action"`
-				ReturnURL               string `json:"return_url"`
-				CancelURL               string `json:"cancel_url"`
-			} `json:"experience_context"`
-		} `json:"paypal"`
-	} `json:"payment_source"`
-	PurchaseUnits []struct {
-		InvoiceID string `json:"invoice_id"`
-		Amount    struct {
-			CurrencyCode string `json:"currency_code"`
-			Value        string `json:"value"`
-			Breakdown    struct {
-				ItemTotal struct {
-					CurrencyCode string `json:"currency_code"`
-					Value        string `json:"value"`
-				} `json:"item_total"`
-				Shipping struct {
-					CurrencyCode string `json:"currency_code"`
-					Value        string `json:"value"`
-				} `json:"shipping"`
-			} `json:"breakdown"`
-		} `json:"amount"`
-		Items []struct {
-			Name        string `json:"name"`
-			Description string `json:"description"`
-			UnitAmount  struct {
-				CurrencyCode string `json:"currency_code"`
-				Value        string `json:"value"`
-			} `json:"unit_amount"`
-			Quantity string `json:"quantity"`
-			Category string `json:"category"`
-			Sku      string `json:"sku"`
-			ImageURL string `json:"image_url"`
-			URL      string `json:"url"`
-			Upc      struct {
-				Type string `json:"type"`
-				Code string `json:"code"`
-			} `json:"upc"`
-		} `json:"items"`
-	} `json:"purchase_units"`
+	Intent        string                     `json:"intent"`
+	PaymentSource *OrderPaymentSource        `json:"payment_source,omitempty"`
+	PurchaseUnits []OrderPurchaseUnitRequest `json:"purchase_units"`
+}
+
+type OrderPaymentSource struct {
+	Paypal OrderPaypalPaymentSource `json:"paypal"`
+}
+
+type OrderPaypalPaymentSource struct {
+	ExperienceContext *OrderPaypalExperienceContext `json:"experience_context,omitempty"`
+	BillingAddress    *PostalAddress                `json:"billing_address,omitempty"`
+}
+
+type OrderPaypalExperienceContext struct {
+	PaymentMethodPreference string `json:"payment_method_preference,omitempty"`
+	LandingPage             string `json:"landing_page,omitempty"`
+	ShippingPreference      string `json:"shipping_preference,omitempty"`
+	UserAction              string `json:"user_action,omitempty"`
+	ReturnURL               string `json:"return_url,omitempty"`
+	CancelURL               string `json:"cancel_url,omitempty"`
+}
+
+type OrderPurchaseUnitRequest struct {
+	InvoiceID string      `json:"invoice_id,omitempty"`
+	Amount    OrderAmount `json:"amount"`
+	Items     []OrderItem `json:"items,omitempty"`
+}
+
+type OrderAmount struct {
+	CurrencyCode string                `json:"currency_code"`
+	Value        string                `json:"value"`
+	Breakdown    *OrderAmountBreakdown `json:"breakdown,omitempty"`
+}
+
+type OrderAmountBreakdown struct {
+	ItemTotal *Money `json:"item_total,omitempty"`
+	Shipping  *Money `json:"shipping,omitempty"`
+}
+
+type OrderItem struct {
+	Name        string    `json:"name,omitempty"`
+	Description string    `json:"description,omitempty"`
+	UnitAmount  Money     `json:"unit_amount"`
+	Quantity    string    `json:"quantity"`
+	Category    string    `json:"category,omitempty"`
+	Sku         string    `json:"sku,omitempty"`
+	ImageURL    string    `json:"image_url,omitempty"`
+	URL         string    `json:"url,omitempty"`
+	Upc         *OrderUPC `json:"upc,omitempty"`
+}
+
+type OrderUPC struct {
+	Type string `json:"type"`
+	Code string `json:"code"`
 }
 
 type CreateOrderResponse struct {
@@ -89,41 +98,22 @@ type CaptureOrderPaymentResponse struct {
 	PurchaseUnits []struct {
 		ReferenceID string `json:"reference_id"`
 		Shipping    struct {
-			Address struct {
-				AddressLine1 string `json:"address_line_1"`
-				AddressLine2 string `json:"address_line_2"`
-				AdminArea2   string `json:"admin_area_2"`
-				AdminArea1   string `json:"admin_area_1"`
-				PostalCode   string `json:"postal_code"`
-				CountryCode  string `json:"country_code"`
-			} `json:"address"`
+			Address PostalAddress `json:"address"`
 		} `json:"shipping"`
 		Payments struct {
 			Captures []struct {
-				ID     string `json:"id"`
-				Status string `json:"status"`
-				Amount struct {
-					CurrencyCode string `json:"currency_code"`
-					Value        string `json:"value"`
-				} `json:"amount"`
+				ID               string `json:"id"`
+				Status           string `json:"status"`
+				Amount           Money  `json:"amount"`
 				SellerProtection struct {
 					Status            string   `json:"status"`
 					DisputeCategories []string `json:"dispute_categories"`
 				} `json:"seller_protection"`
 				FinalCapture              bool `json:"final_capture"`
 				SellerReceivableBreakdown struct {
-					GrossAmount struct {
-						CurrencyCode string `json:"currency_code"`
-						Value        string `json:"value"`
-					} `json:"gross_amount"`
-					PaypalFee struct {
-						CurrencyCode string `json:"currency_code"`
-						Value        string `json:"value"`
-					} `json:"paypal_fee"`
-					NetAmount struct {
-						CurrencyCode string `json:"currency_code"`
-						Value        string `json:"value"`
-					} `json:"net_amount"`
+					GrossAmount Money `json:"gross_amount"`
+					PaypalFee   Money `json:"paypal_fee"`
+					NetAmount   Money `json:"net_amount"`
 				} `json:"seller_receivable_breakdown"`
 				CreateTime time.Time `json:"create_time"`
 				UpdateTime time.Time `json:"update_time"`
@@ -152,13 +142,7 @@ type CaptureOrderPaymentResponse struct {
 
 func (c *Client) CreateOrder(ctx context.Context, order CreateOrderRequest) (*CreateOrderResponse, error) {
 	response := &CreateOrderResponse{}
-	if err := c.api(
-		ctx,
-		http.MethodPost,
-		createOrderEndpoint,
-		order,
-		response,
-	); err != nil {
+	if err := c.api(ctx, http.MethodPost, createOrderEndpoint, order, response); err != nil {
 		return nil, err
 	}
 	return response, nil
@@ -171,14 +155,7 @@ func (c *Client) CaptureOrderPayment(ctx context.Context, orderID string) (*Capt
 
 	response := &CaptureOrderPaymentResponse{}
 	endpoint := strings.Replace(captureOrderPaymentEndpoint, "{orderID}", orderID, 1)
-
-	if err := c.api(
-		ctx,
-		http.MethodPost,
-		endpoint,
-		nil,
-		response,
-	); err != nil {
+	if err := c.api(ctx, http.MethodPost, endpoint, nil, response); err != nil {
 		return nil, err
 	}
 	return response, nil
