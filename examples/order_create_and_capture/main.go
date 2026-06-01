@@ -51,30 +51,14 @@ func createOrderHandler(client *paypal.Client) http.HandlerFunc {
 		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 		defer cancel()
 
-		order := paypal.CreateOrderRequest{
-			Intent: "CAPTURE",
-			PaymentSource: &paypal.OrderPaymentSource{
-				Paypal: paypal.OrderPaypalPaymentSource{
-					ExperienceContext: &paypal.OrderPaypalExperienceContext{
-						PaymentMethodPreference: "IMMEDIATE_PAYMENT_REQUIRED",
-						ShippingPreference:      "NO_SHIPPING",
-					},
-					Address: &paypal.PostalAddress{
-						CountryCode: "CR",
-					},
-				},
-			},
-			PurchaseUnits: []paypal.OrderPurchaseUnitRequest{
-				{
-					Amount: paypal.OrderAmount{
-						CurrencyCode: "USD",
-						Value:        "10.00",
-					},
-				},
-			},
-		}
-
-		response, err := client.CreateOrder(ctx, order)
+		response, err := client.CreateOrder(
+			ctx,
+			"USD",
+			"10.00",
+			paypal.WithOrderImmediatePayment(),
+			paypal.WithoutOrderShipping(),
+			paypal.WithOrderPaypalCountry("CR"),
+		)
 		if err != nil {
 			writeError(w, http.StatusBadGateway, err)
 			return

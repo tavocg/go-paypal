@@ -13,10 +13,63 @@ const (
 	captureOrderPaymentEndpoint = "/v2/checkout/orders/{orderID}/capture"
 )
 
-type CreateOrderRequest struct {
+type Order struct {
 	Intent        string                     `json:"intent"`
 	PaymentSource *OrderPaymentSource        `json:"payment_source,omitempty"`
 	PurchaseUnits []OrderPurchaseUnitRequest `json:"purchase_units"`
+}
+
+type CreateOrderRequest = Order
+
+type OrderOption func(*Order)
+
+func WithOrderShipping() OrderOption {
+	return func(order *Order) {
+		context := order.paypalExperienceContext()
+		context.ShippingPreference = "GET_FROM_FILE"
+	}
+}
+
+func WithoutOrderShipping() OrderOption {
+	return func(order *Order) {
+		context := order.paypalExperienceContext()
+		context.ShippingPreference = "NO_SHIPPING"
+	}
+}
+
+func WithOrderImmediatePayment() OrderOption {
+	return func(order *Order) {
+		context := order.paypalExperienceContext()
+		context.PaymentMethodPreference = "IMMEDIATE_PAYMENT_REQUIRED"
+	}
+}
+
+func WithOrderIntent(intent string) OrderOption {
+	return func(order *Order) {
+		order.Intent = intent
+	}
+}
+
+func WithOrderPaypalCountry(countryCode string) OrderOption {
+	return func(order *Order) {
+		source := order.paypalPaymentSource()
+		source.Address = &PostalAddress{CountryCode: countryCode}
+	}
+}
+
+func (order *Order) paypalPaymentSource() *OrderPaypalPaymentSource {
+	if order.PaymentSource == nil {
+		order.PaymentSource = &OrderPaymentSource{}
+	}
+	return &order.PaymentSource.Paypal
+}
+
+func (order *Order) paypalExperienceContext() *OrderPaypalExperienceContext {
+	source := order.paypalPaymentSource()
+	if source.ExperienceContext == nil {
+		source.ExperienceContext = &OrderPaypalExperienceContext{}
+	}
+	return source.ExperienceContext
 }
 
 type OrderPaymentSource struct {
@@ -141,7 +194,23 @@ type CaptureOrderPaymentResponse struct {
 	} `json:"links"`
 }
 
-func (c *Client) CreateOrder(ctx context.Context, order CreateOrderRequest) (*CreateOrderResponse, error) {
+func (c *Client) CreateOrder(ctx context.Context, currencyCode, amount string, opts ...OrderOption) (*CreateOrderResponse, error) {
+	order := Order{
+		Intent: "CAPTURE",
+		PurchaseUnits: []OrderPurchaseUnitRequest{
+			{
+				Amount: OrderAmount{
+					CurrencyCode: currencyCode,
+					Value:        amount,
+				},
+			},
+		},
+	}
+
+	for _, opt := range opts {
+		opt(&order)
+	}
+
 	response := &CreateOrderResponse{}
 	if err := c.api(ctx, http.MethodPost, createOrderEndpoint, order, response); err != nil {
 		return nil, err
