@@ -25,6 +25,7 @@ type OrderPaymentSource struct {
 
 type OrderPaypalPaymentSource struct {
 	ExperienceContext *OrderPaypalExperienceContext `json:"experience_context,omitempty"`
+	Address           *PostalAddress                `json:"address,omitempty"`
 	BillingAddress    *PostalAddress                `json:"billing_address,omitempty"`
 }
 
